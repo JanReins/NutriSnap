@@ -1,0 +1,6 @@
+{
+  "name": "NutriSnap",
+  "description": "Smart food logger and macro tracker with AI meal recognition",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
