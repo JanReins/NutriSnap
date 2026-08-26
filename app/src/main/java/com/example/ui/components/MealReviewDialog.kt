@@ -53,7 +53,13 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.example.ui.theme.*
+import com.example.ui.theme.EmeraldContainer
+import com.example.ui.theme.EmeraldDark
+import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.MacroCaloriesColor
+import com.example.ui.theme.MacroCarbsColor
+import com.example.ui.theme.MacroFatsColor
+import com.example.ui.theme.MacroProteinColor
 import com.example.ui.viewmodel.ReviewMealState
 import kotlin.math.roundToInt
 
@@ -118,12 +124,12 @@ fun MealReviewDialog(
                                 text = "AI Meal Breakdown",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = Slate900
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "Review & adjust macros before saving",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Slate500
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -135,7 +141,7 @@ fun MealReviewDialog(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Slate500
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -168,9 +174,9 @@ fun MealReviewDialog(
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = EmeraldPrimary,
-                        unfocusedBorderColor = Slate300,
-                        focusedContainerColor = Slate50,
-                        unfocusedContainerColor = Slate50
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                     )
                 )
 
@@ -179,7 +185,7 @@ fun MealReviewDialog(
                     text = "Nutritional Breakdown",
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
-                    color = Slate700
+                    color = MaterialTheme.colorScheme.onSurface
                 )
 
                 // Calories (Hero input)
@@ -201,9 +207,9 @@ fun MealReviewDialog(
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MacroCaloriesColor,
-                        unfocusedBorderColor = Slate300,
-                        focusedContainerColor = Slate50,
-                        unfocusedContainerColor = Slate50
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                     )
                 )
 
@@ -232,9 +238,9 @@ fun MealReviewDialog(
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MacroProteinColor,
-                            unfocusedBorderColor = Slate300,
-                            focusedContainerColor = Slate50,
-                            unfocusedContainerColor = Slate50
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                         )
                     )
 
@@ -258,9 +264,9 @@ fun MealReviewDialog(
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MacroCarbsColor,
-                            unfocusedBorderColor = Slate300,
-                            focusedContainerColor = Slate50,
-                            unfocusedContainerColor = Slate50
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                         )
                     )
 
@@ -284,9 +290,9 @@ fun MealReviewDialog(
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MacroFatsColor,
-                            unfocusedBorderColor = Slate300,
-                            focusedContainerColor = Slate50,
-                            unfocusedContainerColor = Slate50
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                         )
                     )
                 }
@@ -295,7 +301,9 @@ fun MealReviewDialog(
                 if (notesText.isNotBlank()) {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Slate100),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                        ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
@@ -303,13 +311,13 @@ fun MealReviewDialog(
                                 text = "AI Portion Notes:",
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
-                                color = Slate700
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = notesText,
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Slate600
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }

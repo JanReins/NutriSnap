@@ -39,10 +39,17 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.local.MacroGoalEntity
 import com.example.data.local.MealEntity
-import com.example.ui.theme.*
+import com.example.ui.theme.EmeraldContainer
+import com.example.ui.theme.EmeraldDark
+import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.MacroCaloriesColor
+import com.example.ui.theme.MacroCarbsColor
+import com.example.ui.theme.MacroExceededColor
+import com.example.ui.theme.MacroExceededSoft
+import com.example.ui.theme.MacroFatsColor
+import com.example.ui.theme.MacroProteinColor
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -91,7 +98,7 @@ fun MacroDashboard(
                     Text(
                         text = "Track your targets & real-time intake",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate500
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -183,7 +190,7 @@ private fun HeroCalorieRing(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
-            .background(Slate100)
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
             .padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
@@ -197,7 +204,7 @@ private fun HeroCalorieRing(
             CircularProgressIndicator(
                 progress = { 1f },
                 modifier = Modifier.size(92.dp),
-                color = Slate200,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
                 strokeWidth = 8.dp,
                 strokeCap = StrokeCap.Round
             )
@@ -221,7 +228,7 @@ private fun HeroCalorieRing(
                     text = "${(progress * 100).roundToInt()}%",
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Slate900
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
         }
@@ -236,7 +243,7 @@ private fun HeroCalorieRing(
             Text(
                 text = "Calories Intake",
                 style = MaterialTheme.typography.labelLarge,
-                color = Slate600
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
             Row(verticalAlignment = Alignment.Bottom) {
@@ -244,12 +251,12 @@ private fun HeroCalorieRing(
                     text = "$consumed",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.ExtraBold,
-                    color = if (isOver) MacroExceededColor else Slate900
+                    color = if (isOver) MacroExceededColor else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = " / $goal kcal",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = Slate500,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(bottom = 2.dp, start = 4.dp)
                 )
             }
@@ -258,7 +265,7 @@ private fun HeroCalorieRing(
                 text = if (isOver) "${abs(remaining)} kcal over goal" else "$remaining kcal remaining",
                 style = MaterialTheme.typography.bodySmall,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isOver) MacroExceededColor else EmeraldDark
+                color = if (isOver) MacroExceededColor else EmeraldPrimary
             )
         }
     }
@@ -326,7 +333,7 @@ private fun MacroProgressBar(
                     text = title,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = Slate800
+                    color = MaterialTheme.colorScheme.onSurface
                 )
             }
 
@@ -335,19 +342,19 @@ private fun MacroProgressBar(
                     text = "${consumed.roundToInt()}$unit",
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
-                    color = if (isOver) MacroExceededColor else Slate900
+                    color = if (isOver) MacroExceededColor else MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = " / ${goal.roundToInt()}$unit",
                     style = MaterialTheme.typography.bodySmall,
-                    color = Slate500,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 2.dp)
                 )
                 Text(
                     text = if (isOver) " (+${abs(remaining).roundToInt()}$unit)" else " (${remaining.roundToInt()}$unit left)",
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (isOver) MacroExceededColor else Slate500,
+                    color = if (isOver) MacroExceededColor else MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(start = 4.dp)
                 )
             }
@@ -361,7 +368,7 @@ private fun MacroProgressBar(
                 .height(8.dp)
                 .clip(RoundedCornerShape(4.dp)),
             color = barColor,
-            trackColor = Slate200,
+            trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
             strokeCap = StrokeCap.Round
         )
     }

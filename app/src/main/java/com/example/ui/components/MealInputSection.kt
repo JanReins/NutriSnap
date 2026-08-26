@@ -35,7 +35,6 @@ import androidx.compose.material.icons.rounded.AddPhotoAlternate
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CameraAlt
 import androidx.compose.material.icons.rounded.EditNote
-import androidx.compose.material.icons.rounded.Image
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -60,14 +59,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.ui.theme.*
+import com.example.ui.theme.EmeraldContainer
+import com.example.ui.theme.EmeraldDark
+import com.example.ui.theme.EmeraldPrimary
 
 @Composable
 fun MealInputSection(
@@ -144,7 +145,7 @@ fun MealInputSection(
                     Text(
                         text = "Gemini estimates portions and macros",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate500
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -177,7 +178,7 @@ fun MealInputSection(
             // Mode Toggle Tabs (Text / Photo)
             TabRow(
                 selectedTabIndex = selectedTab,
-                containerColor = Slate100,
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp)),
@@ -210,7 +211,7 @@ fun MealInputSection(
                         }
                     },
                     selectedContentColor = EmeraldPrimary,
-                    unselectedContentColor = Slate500
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
 
                 Tab(
@@ -233,7 +234,7 @@ fun MealInputSection(
                         }
                     },
                     selectedContentColor = EmeraldPrimary,
-                    unselectedContentColor = Slate500
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
@@ -282,7 +283,7 @@ fun MealInputSection(
                         placeholder = {
                             Text(
                                 text = "e.g., 1 bowl of oatmeal with blueberries & 2 boiled eggs",
-                                color = Slate400,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                 style = MaterialTheme.typography.bodyMedium
                             )
                         },
@@ -291,9 +292,9 @@ fun MealInputSection(
                         shape = RoundedCornerShape(16.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = EmeraldPrimary,
-                            unfocusedBorderColor = Slate300,
-                            focusedContainerColor = Slate50,
-                            unfocusedContainerColor = Slate50
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                         )
                     )
 
@@ -314,7 +315,7 @@ fun MealInputSection(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
-                                    .background(Slate100)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
                                     .clickable {
                                         textInput = suggestion.substringAfter(" ")
                                     }
@@ -323,7 +324,7 @@ fun MealInputSection(
                                 Text(
                                     text = suggestion,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = Slate700
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                         }
@@ -370,7 +371,7 @@ fun MealInputSection(
                                 .fillMaxWidth()
                                 .height(180.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .border(1.dp, Slate200, RoundedCornerShape(16.dp))
+                                .border(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f), RoundedCornerShape(16.dp))
                         ) {
                             Image(
                                 bitmap = selectedPhotoBitmap!!.asImageBitmap(),
@@ -386,12 +387,12 @@ fun MealInputSection(
                                     .padding(8.dp)
                                     .size(32.dp)
                                     .clip(CircleShape)
-                                    .background(Slate900.copy(alpha = 0.6f))
+                                    .background(Color.Black.copy(alpha = 0.6f))
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Remove photo",
-                                    tint = MaterialTheme.colorScheme.onPrimary,
+                                    tint = Color.White,
                                     modifier = Modifier.size(18.dp)
                                 )
                             }
@@ -404,7 +405,7 @@ fun MealInputSection(
                             placeholder = {
                                 Text(
                                     text = "Optional: Add details (e.g., extra dressing, 2 cups)",
-                                    color = Slate400,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                     style = MaterialTheme.typography.bodySmall
                                 )
                             },
@@ -413,9 +414,9 @@ fun MealInputSection(
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = EmeraldPrimary,
-                                unfocusedBorderColor = Slate300,
-                                focusedContainerColor = Slate50,
-                                unfocusedContainerColor = Slate50
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                             )
                         )
 
@@ -460,7 +461,9 @@ fun MealInputSection(
                                     .clip(RoundedCornerShape(16.dp))
                                     .clickable { cameraLauncher.launch(null) }
                                     .testTag("camera_button"),
-                                colors = CardDefaults.cardColors(containerColor = Slate100),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                ),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
                                 Column(
@@ -489,7 +492,7 @@ fun MealInputSection(
                                         text = "Snap Camera",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = Slate900
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }
@@ -502,7 +505,9 @@ fun MealInputSection(
                                     .clip(RoundedCornerShape(16.dp))
                                     .clickable { galleryLauncher.launch("image/*") }
                                     .testTag("gallery_button"),
-                                colors = CardDefaults.cardColors(containerColor = Slate100),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
+                                ),
                                 shape = RoundedCornerShape(16.dp)
                             ) {
                                 Column(
@@ -531,7 +536,7 @@ fun MealInputSection(
                                         text = "Upload Image",
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold,
-                                        color = Slate900
+                                        color = MaterialTheme.colorScheme.onSurface
                                     )
                                 }
                             }

@@ -22,6 +22,20 @@ class NutriRepository(
         return dao.getAllMeals()
     }
 
+    suspend fun getAllMealsDirect(): List<MealEntity> {
+        return dao.getAllMealsDirect()
+    }
+
+    suspend fun getMacroGoalsDirect(): MacroGoalEntity {
+        return dao.getMacroGoalsDirect() ?: MacroGoalEntity(
+            id = 1,
+            targetCalories = 2000,
+            targetProtein = 150f,
+            targetCarbs = 200f,
+            targetFats = 65f
+        )
+    }
+
     fun getMacroGoals(): Flow<MacroGoalEntity> {
         return dao.getMacroGoals().map { saved ->
             saved ?: MacroGoalEntity(
@@ -44,6 +58,23 @@ class NutriRepository(
 
     suspend fun updateGoals(goals: MacroGoalEntity) {
         dao.setMacroGoals(goals)
+    }
+
+    suspend fun overwriteAllData(meals: List<MealEntity>, goals: MacroGoalEntity) {
+        dao.overwriteAllData(meals, goals)
+    }
+
+    suspend fun clearAllData() {
+        dao.clearAllMeals()
+        dao.setMacroGoals(
+            MacroGoalEntity(
+                id = 1,
+                targetCalories = 2000,
+                targetProtein = 150f,
+                targetCarbs = 200f,
+                targetFats = 65f
+            )
+        )
     }
 
     suspend fun analyzeMeal(

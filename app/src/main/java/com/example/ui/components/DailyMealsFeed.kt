@@ -1,9 +1,6 @@
 package com.example.ui.components
 
 import android.graphics.BitmapFactory
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,16 +34,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
-import coil.compose.AsyncImage
 import com.example.data.local.MealEntity
-import com.example.ui.theme.*
+import com.example.ui.theme.EmeraldContainer
+import com.example.ui.theme.EmeraldDark
+import com.example.ui.theme.EmeraldPrimary
+import com.example.ui.theme.MacroCaloriesColor
+import com.example.ui.theme.MacroCarbsColor
+import com.example.ui.theme.MacroExceededColor
+import com.example.ui.theme.MacroFatsColor
+import com.example.ui.theme.MacroProteinColor
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -94,7 +96,7 @@ fun DailyMealsFeed(
                         text = "${meals.size}",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = EmeraldPrimary
+                        color = EmeraldDark
                     )
                 }
             }
@@ -105,7 +107,7 @@ fun DailyMealsFeed(
                     text = "Total: $totalCals kcal",
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.SemiBold,
-                    color = Slate600
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
@@ -148,7 +150,7 @@ fun DailyMealsFeed(
                         text = "No meals logged today yet",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Slate800
+                        color = MaterialTheme.colorScheme.onSurface
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))
@@ -156,7 +158,7 @@ fun DailyMealsFeed(
                     Text(
                         text = "Type what you ate or snap a food photo above to let Gemini AI estimate your macros!",
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate500,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
                     )
                 }
@@ -178,7 +180,7 @@ fun DailyMealsFeed(
     if (mealToDelete != null) {
         AlertDialog(
             onDismissRequest = { mealToDelete = null },
-            title = { Text("Delete Meal Entry?") },
+            title = { Text("Delete Meal Entry?", fontWeight = FontWeight.Bold) },
             text = { Text("Are you sure you want to remove \"${mealToDelete?.mealName}\"? This will update your daily macro totals.") },
             confirmButton = {
                 TextButton(
@@ -259,13 +261,13 @@ private fun MealItemCard(
                         text = meal.mealName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
-                        color = Slate900,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 1
                     )
                     Text(
                         text = timeFormatted,
                         style = MaterialTheme.typography.labelSmall,
-                        color = Slate400
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
@@ -279,28 +281,28 @@ private fun MealItemCard(
                     MacroPill(
                         label = "${meal.calories} kcal",
                         color = MacroCaloriesColor,
-                        bgColor = EmeraldContainer
+                        bgColor = MacroCaloriesColor.copy(alpha = 0.15f)
                     )
 
                     // Protein
                     MacroPill(
                         label = "${meal.proteinGrams.roundToInt()}g P",
                         color = MacroProteinColor,
-                        bgColor = Color(0xFFEDE9FE)
+                        bgColor = MacroProteinColor.copy(alpha = 0.15f)
                     )
 
                     // Carbs
                     MacroPill(
                         label = "${meal.carbsGrams.roundToInt()}g C",
                         color = MacroCarbsColor,
-                        bgColor = Color(0xFFE0F2FE)
+                        bgColor = MacroCarbsColor.copy(alpha = 0.15f)
                     )
 
                     // Fats
                     MacroPill(
                         label = "${meal.fatsGrams.roundToInt()}g F",
                         color = MacroFatsColor,
-                        bgColor = Color(0xFFFEF3C7)
+                        bgColor = MacroFatsColor.copy(alpha = 0.15f)
                     )
                 }
 
@@ -308,7 +310,7 @@ private fun MealItemCard(
                     Text(
                         text = meal.notes,
                         style = MaterialTheme.typography.bodySmall,
-                        color = Slate500,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
                     )
                 }
@@ -324,7 +326,7 @@ private fun MealItemCard(
                 Icon(
                     imageVector = Icons.Outlined.Delete,
                     contentDescription = "Delete meal",
-                    tint = Slate400,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier.size(20.dp)
                 )
             }
@@ -353,8 +355,8 @@ private fun FallbackMealIcon() {
 @Composable
 private fun MacroPill(
     label: String,
-    color: androidx.compose.ui.graphics.Color,
-    bgColor: androidx.compose.ui.graphics.Color
+    color: Color,
+    bgColor: Color
 ) {
     Box(
         modifier = Modifier

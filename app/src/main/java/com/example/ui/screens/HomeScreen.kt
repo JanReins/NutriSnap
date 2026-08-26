@@ -22,8 +22,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.rounded.Eco
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -49,14 +53,12 @@ import com.example.ui.components.MacroDashboard
 import com.example.ui.components.MealInputSection
 import com.example.ui.components.MealReviewDialog
 import com.example.ui.components.SetGoalsDialog
+import com.example.ui.components.SettingsDialog
 import com.example.ui.theme.EmeraldContainer
 import com.example.ui.theme.EmeraldDark
 import com.example.ui.theme.EmeraldPrimary
 import com.example.ui.theme.MacroExceededColor
 import com.example.ui.theme.MacroExceededSoft
-import com.example.ui.theme.Slate500
-import com.example.ui.theme.Slate600
-import com.example.ui.theme.Slate900
 import com.example.ui.viewmodel.NutriViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -72,8 +74,11 @@ fun HomeScreen(
     val isAnalyzing by viewModel.isAnalyzing.collectAsStateWithLifecycle()
     val analysisStatusText by viewModel.analysisStatusText.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
     val reviewState by viewModel.reviewState.collectAsStateWithLifecycle()
     val showGoalsDialog by viewModel.showGoalsDialog.collectAsStateWithLifecycle()
+    val showSettingsDialog by viewModel.showSettingsDialog.collectAsStateWithLifecycle()
+    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
     val selectedDateMillis by viewModel.selectedDateMillis.collectAsStateWithLifecycle()
 
     val formattedDate = remember(selectedDateMillis) {
@@ -106,12 +111,25 @@ fun HomeScreen(
                 ),
                 verticalArrangement = Arrangement.spacedBy(18.dp)
             ) {
-                // Top Header Section
+                // Top Header Section with Brand, Theme Toggle & Actions
                 item {
                     HeaderSection(
                         todayFormattedDate = formattedDate,
+                        isDarkMode = isDarkMode,
+                        onToggleTheme = { viewModel.toggleTheme() },
+                        onOpenSettings = { viewModel.openSettings() },
                         onOpenGoals = { viewModel.openGoalsDialog() }
                     )
+                }
+
+                // Info Message banner (if any)
+                if (infoMessage != null) {
+                    item {
+                        InfoMessageBanner(
+                            message = infoMessage ?: "",
+                            onDismiss = { viewModel.clearInfo() }
+                        )
+                    }
                 }
 
                 // Error Message banner (if any)
@@ -162,6 +180,15 @@ fun HomeScreen(
                 )
             }
 
+            // Settings & Backup Modal
+            if (showSettingsDialog) {
+                SettingsDialog(
+                    viewModel = viewModel,
+                    isDarkMode = isDarkMode,
+                    onDismiss = { viewModel.closeSettings() }
+                )
+            }
+
             // Editable Meal Review Pop-up Modal
             reviewState?.let { currentReview ->
                 MealReviewDialog(
@@ -179,77 +206,178 @@ fun HomeScreen(
 @Composable
 private fun HeaderSection(
     todayFormattedDate: String,
+    isDarkMode: Boolean,
+    onToggleTheme: () -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenGoals: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("home_header"),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // App brand & Date
-        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // App brand & Date
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(EmeraldPrimary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.Eco,
+                            contentDescription = "NutriSnap Logo",
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                    Text(
+                        text = "NutriSnap",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Text(
+                    text = todayFormattedDate,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // Header Action Buttons: Theme Toggle, Settings, Set Macros
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Box(
+                // Sun / Moon Theme Toggle Icon Button
+                IconButton(
+                    onClick = onToggleTheme,
                     modifier = Modifier
-                        .size(28.dp)
+                        .size(38.dp)
                         .clip(CircleShape)
-                        .background(EmeraldPrimary),
-                    contentAlignment = Alignment.Center
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                        .testTag("theme_toggle_button")
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.Eco,
-                        contentDescription = "NutriSnap Logo",
-                        tint = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.size(16.dp)
+                        imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = if (isDarkMode) "Switch to Light Mode" else "Switch to Dark Mode",
+                        tint = if (isDarkMode) EmeraldPrimary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
+
+                // Settings & Backup Icon Button
+                IconButton(
+                    onClick = onOpenSettings,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
+                        .testTag("settings_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Settings,
+                        contentDescription = "Settings & Backup",
+                        tint = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // "Set My Macros" Button
+                Button(
+                    onClick = onOpenGoals,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = EmeraldContainer,
+                        contentColor = EmeraldDark
+                    ),
+                    modifier = Modifier
+                        .height(38.dp)
+                        .testTag("set_macros_button"),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Tune,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = EmeraldDark
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "Macros",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = EmeraldDark
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InfoMessageBanner(
+    message: String,
+    onDismiss: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("info_banner"),
+        shape = RoundedCornerShape(14.dp),
+        colors = CardDefaults.cardColors(containerColor = EmeraldContainer)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = EmeraldPrimary,
+                    modifier = Modifier.size(18.dp)
+                )
                 Text(
-                    text = "NutriSnap",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Slate900
+                    text = message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = EmeraldDark,
+                    fontWeight = FontWeight.SemiBold
                 )
             }
 
-            Text(
-                text = todayFormattedDate,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = FontWeight.Medium,
-                color = Slate500
-            )
-        }
-
-        // "Set My Macros" Button
-        Button(
-            onClick = onOpenGoals,
-            shape = RoundedCornerShape(14.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = EmeraldContainer,
-                contentColor = EmeraldDark
-            ),
-            modifier = Modifier
-                .height(42.dp)
-                .testTag("set_macros_button"),
-            contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.Tune,
-                contentDescription = null,
-                modifier = Modifier.size(16.dp),
-                tint = EmeraldDark
-            )
-            Spacer(modifier = Modifier.width(6.dp))
-            Text(
-                text = "Set My Macros",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                color = EmeraldDark
-            )
+            IconButton(
+                onClick = onDismiss,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Close,
+                    contentDescription = "Dismiss",
+                    tint = EmeraldDark,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
         }
     }
 }

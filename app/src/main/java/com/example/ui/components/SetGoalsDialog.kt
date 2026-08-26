@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -52,11 +51,6 @@ import com.example.ui.theme.MacroCaloriesColor
 import com.example.ui.theme.MacroCarbsColor
 import com.example.ui.theme.MacroFatsColor
 import com.example.ui.theme.MacroProteinColor
-import com.example.ui.theme.Slate300
-import com.example.ui.theme.Slate50
-import com.example.ui.theme.Slate500
-import com.example.ui.theme.Slate700
-import com.example.ui.theme.Slate900
 import kotlin.math.roundToInt
 
 @Composable
@@ -109,12 +103,12 @@ fun SetGoalsDialog(
                                 text = "Set Daily Targets",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
-                                color = Slate900
+                                color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
                                 text = "Configure your Cronometer-style goals",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = Slate500
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
@@ -126,7 +120,7 @@ fun SetGoalsDialog(
                         Icon(
                             imageVector = Icons.Default.Close,
                             contentDescription = "Close",
-                            tint = Slate500
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
@@ -137,7 +131,7 @@ fun SetGoalsDialog(
                         text = "Quick Presets:",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = Slate700
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                     Row(
                         modifier = Modifier
@@ -216,9 +210,9 @@ fun SetGoalsDialog(
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MacroCaloriesColor,
-                            unfocusedBorderColor = Slate300,
-                            focusedContainerColor = Slate50,
-                            unfocusedContainerColor = Slate50
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                         )
                     )
 
@@ -246,9 +240,9 @@ fun SetGoalsDialog(
                             shape = RoundedCornerShape(14.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MacroProteinColor,
-                                unfocusedBorderColor = Slate300,
-                                focusedContainerColor = Slate50,
-                                unfocusedContainerColor = Slate50
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                             )
                         )
 
@@ -271,9 +265,9 @@ fun SetGoalsDialog(
                             shape = RoundedCornerShape(14.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MacroCarbsColor,
-                                unfocusedBorderColor = Slate300,
-                                focusedContainerColor = Slate50,
-                                unfocusedContainerColor = Slate50
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                             )
                         )
 
@@ -296,9 +290,9 @@ fun SetGoalsDialog(
                             shape = RoundedCornerShape(14.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = MacroFatsColor,
-                                unfocusedBorderColor = Slate300,
-                                focusedContainerColor = Slate50,
-                                unfocusedContainerColor = Slate50
+                                unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
+                                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                             )
                         )
                     }
