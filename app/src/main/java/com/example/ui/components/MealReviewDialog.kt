@@ -2,6 +2,7 @@ package com.example.ui.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,17 +19,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Category
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.Grain
 import androidx.compose.material.icons.rounded.LocalFireDepartment
 import androidx.compose.material.icons.rounded.Opacity
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -51,6 +54,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.example.ui.theme.EmeraldContainer
@@ -60,21 +64,39 @@ import com.example.ui.theme.MacroCaloriesColor
 import com.example.ui.theme.MacroCarbsColor
 import com.example.ui.theme.MacroFatsColor
 import com.example.ui.theme.MacroProteinColor
+import com.example.ui.theme.Slate200
+import com.example.ui.theme.Slate700
 import com.example.ui.viewmodel.ReviewMealState
 import kotlin.math.roundToInt
 
 @Composable
 fun MealReviewDialog(
     reviewState: ReviewMealState,
-    onConfirm: (name: String, calories: Int, protein: Float, carbs: Float, fats: Float, notes: String) -> Unit,
+    onSave: (
+        name: String,
+        calories: Int,
+        protein: Float,
+        carbs: Float,
+        fats: Float,
+        fiber: Float,
+        sugar: Float,
+        mealType: String,
+        notes: String
+    ) -> Unit,
     onDismiss: () -> Unit
 ) {
     var mealName by remember { mutableStateOf(reviewState.mealName) }
+    var mealType by remember { mutableStateOf(reviewState.mealType.ifBlank { "Meal" }) }
     var caloriesText by remember { mutableStateOf(reviewState.calories.toString()) }
     var proteinText by remember { mutableStateOf(reviewState.protein.roundToInt().toString()) }
     var carbsText by remember { mutableStateOf(reviewState.carbs.roundToInt().toString()) }
     var fatsText by remember { mutableStateOf(reviewState.fats.roundToInt().toString()) }
+    var fiberText by remember { mutableStateOf(if (reviewState.fiber > 0) reviewState.fiber.roundToInt().toString() else "0") }
+    var sugarText by remember { mutableStateOf(if (reviewState.sugar > 0) reviewState.sugar.roundToInt().toString() else "0") }
     var notesText by remember { mutableStateOf(reviewState.notes) }
+
+    val isEditingExisting = reviewState.id != null
+    val mealTypeOptions = listOf("Breakfast", "Lunch", "Dinner", "Snack")
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -82,7 +104,7 @@ fun MealReviewDialog(
     ) {
         Surface(
             modifier = Modifier
-                .fillMaxWidth(0.94f)
+                .fillMaxWidth(0.95f)
                 .clip(RoundedCornerShape(28.dp))
                 .testTag("meal_review_dialog"),
             color = MaterialTheme.colorScheme.surface,
@@ -91,11 +113,11 @@ fun MealReviewDialog(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp)
+                    .padding(22.dp)
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // Header with AI Sparkle badge
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -103,7 +125,7 @@ fun MealReviewDialog(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Box(
                             modifier = Modifier
@@ -113,7 +135,7 @@ fun MealReviewDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                imageVector = Icons.Rounded.AutoAwesome,
+                                imageVector = if (reviewState.isAiEstimate) Icons.Rounded.AutoAwesome else Icons.Rounded.Tune,
                                 contentDescription = null,
                                 tint = EmeraldPrimary,
                                 modifier = Modifier.size(20.dp)
@@ -121,13 +143,13 @@ fun MealReviewDialog(
                         }
                         Column {
                             Text(
-                                text = "AI Meal Breakdown",
+                                text = if (isEditingExisting) "Edit Meal Entry" else "Review & Save Meal",
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Review & adjust macros before saving",
+                                text = if (reviewState.isAiEstimate) "Estimated with Gemini AI" else "Local estimate / Manual entry",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -146,53 +168,98 @@ fun MealReviewDialog(
                     }
                 }
 
-                // Optional Photo Preview
-                if (reviewState.photoBitmap != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(140.dp)
-                            .clip(RoundedCornerShape(16.dp))
+                // AI Provenance Badge Banner
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (reviewState.isAiEstimate) EmeraldContainer.copy(alpha = 0.7f)
+                            else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        )
+                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Image(
-                            bitmap = reviewState.photoBitmap.asImageBitmap(),
-                            contentDescription = "Meal Photo",
-                            modifier = Modifier.fillMaxWidth(),
-                            contentScale = ContentScale.Crop
+                        Icon(
+                            imageVector = if (reviewState.isAiEstimate) Icons.Rounded.AutoAwesome else Icons.Rounded.Tune,
+                            contentDescription = null,
+                            tint = if (reviewState.isAiEstimate) EmeraldDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = if (reviewState.isAiEstimate) "AI Nutritional Estimate — You can tweak values before saving"
+                            else "Local/Heuristic Estimate — Please verify portions and macros",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (reviewState.isAiEstimate) EmeraldDark else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
 
-                // Meal Name Field
+                // Optional Photo Preview
+                if (reviewState.photoBitmap != null) {
+                    Image(
+                        bitmap = reviewState.photoBitmap.asImageBitmap(),
+                        contentDescription = "Logged food photo",
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(160.dp)
+                            .clip(RoundedCornerShape(16.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                }
+
+                // Meal Name
                 OutlinedTextField(
                     value = mealName,
                     onValueChange = { mealName = it },
                     label = { Text("Meal Name") },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("meal_name_input"),
+                        .testTag("review_meal_name_input"),
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = EmeraldPrimary,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
                     )
                 )
 
-                // Editable Macro Grid
-                Text(
-                    text = "Nutritional Breakdown",
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
+                // Meal Category Chips (Breakfast, Lunch, Dinner, Snack)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "Meal Type:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        mealTypeOptions.forEach { type ->
+                            FilterChip(
+                                selected = mealType.equals(type, ignoreCase = true),
+                                onClick = { mealType = type },
+                                label = { Text(type) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = EmeraldContainer,
+                                    selectedLabelColor = EmeraldDark
+                                )
+                            )
+                        }
+                    }
+                }
 
-                // Calories (Hero input)
+                // Total Calories
                 OutlinedTextField(
                     value = caloriesText,
-                    onValueChange = { caloriesText = it.filter { char -> char.isDigit() } },
-                    label = { Text("Total Calories (kcal)") },
+                    onValueChange = { caloriesText = it.filter { c -> c.isDigit() } },
+                    label = { Text("Calories (kcal)") },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Rounded.LocalFireDepartment,
@@ -203,25 +270,22 @@ fun MealReviewDialog(
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .testTag("calories_input"),
+                        .testTag("review_calories_input"),
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = MacroCaloriesColor,
-                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                        focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                        unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
                     )
                 )
 
-                // 3-Macro Row (Protein, Carbs, Fats)
+                // 3 Core Macros (Protein, Carbs, Fats)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Protein
                     OutlinedTextField(
                         value = proteinText,
-                        onValueChange = { proteinText = it.filter { char -> char.isDigit() || char == '.' } },
+                        onValueChange = { proteinText = it.filter { c -> c.isDigit() } },
                         label = { Text("Protein (g)") },
                         leadingIcon = {
                             Icon(
@@ -231,23 +295,20 @@ fun MealReviewDialog(
                                 modifier = Modifier.size(16.dp)
                             )
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
                             .weight(1f)
-                            .testTag("protein_input"),
+                            .testTag("review_protein_input"),
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MacroProteinColor,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
                         )
                     )
 
-                    // Carbs
                     OutlinedTextField(
                         value = carbsText,
-                        onValueChange = { carbsText = it.filter { char -> char.isDigit() || char == '.' } },
+                        onValueChange = { carbsText = it.filter { c -> c.isDigit() } },
                         label = { Text("Carbs (g)") },
                         leadingIcon = {
                             Icon(
@@ -257,23 +318,20 @@ fun MealReviewDialog(
                                 modifier = Modifier.size(16.dp)
                             )
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
                             .weight(1f)
-                            .testTag("carbs_input"),
+                            .testTag("review_carbs_input"),
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MacroCarbsColor,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
                         )
                     )
 
-                    // Fats
                     OutlinedTextField(
                         value = fatsText,
-                        onValueChange = { fatsText = it.filter { char -> char.isDigit() || char == '.' } },
+                        onValueChange = { fatsText = it.filter { c -> c.isDigit() } },
                         label = { Text("Fats (g)") },
                         leadingIcon = {
                             Icon(
@@ -283,45 +341,63 @@ fun MealReviewDialog(
                                 modifier = Modifier.size(16.dp)
                             )
                         },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier
                             .weight(1f)
-                            .testTag("fats_input"),
+                            .testTag("review_fats_input"),
                         shape = RoundedCornerShape(14.dp),
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = MacroFatsColor,
-                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f),
-                            focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+                            unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
                         )
                     )
                 }
 
-                // AI Notes / Explanation
-                if (notesText.isNotBlank()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-                        ),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Text(
-                                text = "AI Portion Notes:",
-                                style = MaterialTheme.typography.labelSmall,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = notesText,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
+                // Optional Fiber & Sugar
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = fiberText,
+                        onValueChange = { fiberText = it.filter { c -> c.isDigit() } },
+                        label = { Text("Fiber (g)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp)
+                    )
+
+                    OutlinedTextField(
+                        value = sugarText,
+                        onValueChange = { sugarText = it.filter { c -> c.isDigit() } },
+                        label = { Text("Sugar (g)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(14.dp)
+                    )
                 }
+
+                // AI Notes & Portion Breakdown
+                OutlinedTextField(
+                    value = notesText,
+                    onValueChange = { notesText = it },
+                    label = { Text("Portion Notes & Ingredients") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Rounded.EditNote,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = EmeraldPrimary,
+                        unfocusedBorderColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.15f)
+                    ),
+                    minLines = 2,
+                    maxLines = 4
+                )
 
                 Spacer(modifier = Modifier.height(6.dp))
 
@@ -337,35 +413,42 @@ fun MealReviewDialog(
                             .height(48.dp),
                         shape = RoundedCornerShape(14.dp)
                     ) {
-                        Text("Discard")
+                        Text("Cancel")
                     }
 
                     Button(
                         onClick = {
-                            val cal = caloriesText.toIntOrNull() ?: reviewState.calories
+                            val cals = caloriesText.toIntOrNull() ?: reviewState.calories
                             val p = proteinText.toFloatOrNull() ?: reviewState.protein
                             val c = carbsText.toFloatOrNull() ?: reviewState.carbs
                             val f = fatsText.toFloatOrNull() ?: reviewState.fats
-                            onConfirm(mealName, cal, p, c, f, notesText)
+                            val fib = fiberText.toFloatOrNull() ?: reviewState.fiber
+                            val sug = sugarText.toFloatOrNull() ?: reviewState.sugar
+
+                            onSave(
+                                mealName.ifBlank { "Logged Meal" },
+                                cals,
+                                p,
+                                c,
+                                f,
+                                fib,
+                                sug,
+                                mealType,
+                                notesText
+                            )
                         },
                         modifier = Modifier
                             .weight(1.5f)
                             .height(48.dp)
-                            .testTag("save_meal_review_button"),
+                            .testTag("confirm_save_meal_button"),
                         shape = RoundedCornerShape(14.dp),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = EmeraldPrimary,
                             contentColor = MaterialTheme.colorScheme.onPrimary
                         )
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Check,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "Save to Log",
+                            text = if (isEditingExisting) "Save Changes" else "Add to Daily Log",
                             fontWeight = FontWeight.Bold
                         )
                     }

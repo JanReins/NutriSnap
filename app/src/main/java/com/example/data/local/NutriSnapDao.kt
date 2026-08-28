@@ -5,8 +5,12 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * Data Access Object for NutriSnap local database operations.
+ */
 @Dao
 interface NutriSnapDao {
 
@@ -16,11 +20,17 @@ interface NutriSnapDao {
     @Query("SELECT * FROM meals ORDER BY timestamp DESC")
     suspend fun getAllMealsDirect(): List<MealEntity>
 
+    @Query("SELECT * FROM meals WHERE id = :mealId LIMIT 1")
+    suspend fun getMealById(mealId: Long): MealEntity?
+
     @Query("SELECT * FROM meals WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay ORDER BY timestamp DESC")
     fun getMealsForDate(startOfDay: Long, endOfDay: Long): Flow<List<MealEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMeal(meal: MealEntity): Long
+
+    @Update
+    suspend fun updateMeal(meal: MealEntity)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMeals(meals: List<MealEntity>)

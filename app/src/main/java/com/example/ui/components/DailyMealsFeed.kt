@@ -3,6 +3,7 @@ package com.example.ui.components
 import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,8 +17,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Fastfood
 import androidx.compose.material.icons.rounded.Restaurant
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -59,6 +63,7 @@ import kotlin.math.roundToInt
 @Composable
 fun DailyMealsFeed(
     meals: List<MealEntity>,
+    onEditMeal: (MealEntity) -> Unit,
     onDeleteMeal: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -81,7 +86,7 @@ fun DailyMealsFeed(
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text(
-                    text = "Today's Logged Meals",
+                    text = "Logged Meals",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -147,7 +152,7 @@ fun DailyMealsFeed(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "No meals logged today yet",
+                        text = "No meals logged for this day",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -156,7 +161,7 @@ fun DailyMealsFeed(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     Text(
-                        text = "Type what you ate or snap a food photo above to let Gemini AI estimate your macros!",
+                        text = "Type what you ate or snap a food photo above to estimate your macros!",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -169,6 +174,7 @@ fun DailyMealsFeed(
                 meals.forEach { meal ->
                     MealItemCard(
                         meal = meal,
+                        onClick = { onEditMeal(meal) },
                         onDeleteClick = { mealToDelete = meal }
                     )
                 }
@@ -181,7 +187,7 @@ fun DailyMealsFeed(
         AlertDialog(
             onDismissRequest = { mealToDelete = null },
             title = { Text("Delete Meal Entry?", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you sure you want to remove \"${mealToDelete?.mealName}\"? This will update your daily macro totals.") },
+            text = { Text("Are you sure you want to remove \"${mealToDelete?.mealName}\"? This will update your daily macro totals and clean up associated image files.") },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -204,6 +210,7 @@ fun DailyMealsFeed(
 @Composable
 private fun MealItemCard(
     meal: MealEntity,
+    onClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     val timeFormatted = remember(meal.timestamp) {
@@ -214,6 +221,8 @@ private fun MealItemCard(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .clickable { onClick() }
             .testTag("meal_item_card_${meal.id}"),
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -257,18 +266,45 @@ private fun MealItemCard(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = meal.mealName,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1
-                    )
-                    Text(
-                        text = timeFormatted,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text(
+                            text = meal.mealName,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1
+                        )
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (meal.mealType.isNotBlank() && meal.mealType != "Meal") {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = meal.mealType,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        Text(
+                            text = timeFormatted,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
 
                 // Macro pill badges
@@ -316,19 +352,35 @@ private fun MealItemCard(
                 }
             }
 
-            // Delete Button
-            IconButton(
-                onClick = onDeleteClick,
-                modifier = Modifier
-                    .size(36.dp)
-                    .testTag("delete_meal_button_${meal.id}")
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.Delete,
-                    contentDescription = "Delete meal",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
-                    modifier = Modifier.size(20.dp)
-                )
+            // Actions: Edit and Delete
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onClick,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .testTag("edit_meal_button_${meal.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Edit,
+                        contentDescription = "Edit meal",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                IconButton(
+                    onClick = onDeleteClick,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .testTag("delete_meal_button_${meal.id}")
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Delete,
+                        contentDescription = "Delete meal",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
     }

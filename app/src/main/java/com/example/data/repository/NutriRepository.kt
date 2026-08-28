@@ -9,6 +9,9 @@ import com.example.data.local.NutriSnapDao
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
+/**
+ * Single source of truth repository managing meal history, macro goals, and AI analysis.
+ */
 class NutriRepository(
     private val dao: NutriSnapDao,
     private val geminiService: GeminiMealService = GeminiMealService()
@@ -24,6 +27,10 @@ class NutriRepository(
 
     suspend fun getAllMealsDirect(): List<MealEntity> {
         return dao.getAllMealsDirect()
+    }
+
+    suspend fun getMealById(id: Long): MealEntity? {
+        return dao.getMealById(id)
     }
 
     suspend fun getMacroGoalsDirect(): MacroGoalEntity {
@@ -50,6 +57,10 @@ class NutriRepository(
 
     suspend fun saveMeal(meal: MealEntity): Long {
         return dao.insertMeal(meal)
+    }
+
+    suspend fun updateMeal(meal: MealEntity) {
+        dao.updateMeal(meal)
     }
 
     suspend fun deleteMeal(mealId: Long) {

@@ -13,6 +13,8 @@ import com.example.data.local.NutriSnapDatabase
 import com.example.data.repository.NutriRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -32,23 +34,41 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
+/**
+ * State object representing an active meal review or edit dialog.
+ * Holds all macro & micronutrient inputs, meal category, photo data, and provenance.
+ */
 data class ReviewMealState(
+    val id: Long? = null, // null for new logs; contains database ID when editing existing entry
     val mealName: String,
     val calories: Int,
     val protein: Float,
     val carbs: Float,
     val fats: Float,
+    val fiber: Float = 0f,
+    val sugar: Float = 0f,
+    val mealType: String = "Meal", // Breakfast, Lunch, Dinner, Snack
     val notes: String = "",
     val photoBitmap: Bitmap? = null,
-    val imagePath: String? = null
+    val imagePath: String? = null,
+    val isAiEstimate: Boolean = true,
+    val originalTimestamp: Long? = null
 )
 
+/**
+ * Preview model displayed before confirming a backup import.
+ */
 data class BackupImportPreview(
     val mealsCount: Int,
     val meals: List<MealEntity>,
     val goals: MacroGoalEntity
 )
 
+/**
+ * Main ViewModel for NutriSnap.
+ * Manages daily meal state, macro goals, AI & local heuristic estimation, date navigation,
+ * photo disk storage lifecycle, and JSON backup export/import.
+ */
 class NutriViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("nutrisnap_user_preferences", Context.MODE_PRIVATE)
@@ -63,21 +83,27 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
     private val _isDarkMode = MutableStateFlow(prefs.getBoolean("dark_theme_enabled", false))
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
 
+    // Selected Date Navigation state (defaults to today)
     private val _selectedDateMillis = MutableStateFlow(System.currentTimeMillis())
     val selectedDateMillis: StateFlow<Long> = _selectedDateMillis.asStateFlow()
 
+    // AI Analysis status
     private val _isAnalyzing = MutableStateFlow(false)
     val isAnalyzing: StateFlow<Boolean> = _isAnalyzing.asStateFlow()
 
     private val _analysisStatusText = MutableStateFlow("Analyzing your meal with Gemini AI...")
     val analysisStatusText: StateFlow<String> = _analysisStatusText.asStateFlow()
 
+    // Status notifications & banners
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
     private val _infoMessage = MutableStateFlow<String?>(null)
     val infoMessage: StateFlow<String?> = _infoMessage.asStateFlow()
 
+    private var infoBannerJob: Job? = null
+
+    // Dialog states
     private val _reviewState = MutableStateFlow<ReviewMealState?>(null)
     val reviewState: StateFlow<ReviewMealState?> = _reviewState.asStateFlow()
 
@@ -90,9 +116,11 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
     private val _pendingImport = MutableStateFlow<BackupImportPreview?>(null)
     val pendingImport: StateFlow<BackupImportPreview?> = _pendingImport.asStateFlow()
 
+    // API Key preference
     private val _customApiKey = MutableStateFlow(prefs.getString("custom_gemini_api_key", null))
     val customApiKey: StateFlow<String?> = _customApiKey.asStateFlow()
 
+    // Macro goals flow
     val macroGoals: StateFlow<MacroGoalEntity> = repository.getMacroGoals()
         .stateIn(
             scope = viewModelScope,
@@ -100,6 +128,7 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = MacroGoalEntity(1, 2000, 150f, 200f, 65f)
         )
 
+    // Meals for the selected date
     @OptIn(ExperimentalCoroutinesApi::class)
     val todayMeals: StateFlow<List<MealEntity>> = _selectedDateMillis
         .flatMapLatest { dateMillis ->
@@ -131,7 +160,47 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
         return Pair(start, end)
     }
 
-    // Theme Toggling & Local Persistence
+    // ==========================================
+    // DATE NAVIGATION LOGIC
+    // ==========================================
+
+    fun goToPreviousDay() {
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = _selectedDateMillis.value
+            add(Calendar.DAY_OF_YEAR, -1)
+        }
+        _selectedDateMillis.value = cal.timeInMillis
+    }
+
+    fun goToNextDay() {
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = _selectedDateMillis.value
+            add(Calendar.DAY_OF_YEAR, 1)
+        }
+        _selectedDateMillis.value = cal.timeInMillis
+    }
+
+    fun goToToday() {
+        _selectedDateMillis.value = System.currentTimeMillis()
+    }
+
+    fun selectDate(millis: Long) {
+        _selectedDateMillis.value = millis
+    }
+
+    fun logForYesterday() {
+        val cal = Calendar.getInstance().apply {
+            timeInMillis = System.currentTimeMillis()
+            add(Calendar.DAY_OF_YEAR, -1)
+        }
+        _selectedDateMillis.value = cal.timeInMillis
+        showInfo("Viewing yesterday's log. New entries will be saved to yesterday.")
+    }
+
+    // ==========================================
+    // THEME & SETTINGS LOGIC
+    // ==========================================
+
     fun toggleTheme() {
         val newMode = !_isDarkMode.value
         _isDarkMode.value = newMode
@@ -153,7 +222,10 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    // Meal AI Analysis
+    // ==========================================
+    // MEAL ANALYSIS (AI & HONEST FALLBACK)
+    // ==========================================
+
     fun analyzeTextMeal(description: String) {
         if (description.isBlank()) {
             _errorMessage.value = "Please enter food or meal details"
@@ -173,15 +245,23 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             _isAnalyzing.value = false
 
             result.onSuccess { estimated ->
+                if (!estimated.isAiEstimate) {
+                    showInfo("AI unavailable. Showing a rough local estimate. Please review and edit before saving.")
+                }
                 _reviewState.value = ReviewMealState(
+                    id = null,
                     mealName = estimated.mealName,
                     calories = estimated.calories,
                     protein = estimated.protein,
                     carbs = estimated.carbs,
                     fats = estimated.fats,
+                    fiber = estimated.fiber,
+                    sugar = estimated.sugar,
+                    mealType = estimated.mealType.ifBlank { guessMealTypeFromTime() },
                     notes = estimated.notes,
                     photoBitmap = null,
-                    imagePath = null
+                    imagePath = null,
+                    isAiEstimate = estimated.isAiEstimate
                 )
             }.onFailure { err ->
                 _errorMessage.value = err.localizedMessage ?: "Failed to analyze meal"
@@ -205,19 +285,83 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
 
             result.onSuccess { estimated ->
                 val savedPath = saveImageToInternalStorage(bitmap)
+                if (!estimated.isAiEstimate) {
+                    showInfo("AI unavailable. Showing a rough local estimate. Please review and edit before saving.")
+                }
                 _reviewState.value = ReviewMealState(
+                    id = null,
                     mealName = estimated.mealName,
                     calories = estimated.calories,
                     protein = estimated.protein,
                     carbs = estimated.carbs,
                     fats = estimated.fats,
+                    fiber = estimated.fiber,
+                    sugar = estimated.sugar,
+                    mealType = estimated.mealType.ifBlank { guessMealTypeFromTime() },
                     notes = estimated.notes,
                     photoBitmap = bitmap,
-                    imagePath = savedPath
+                    imagePath = savedPath,
+                    isAiEstimate = estimated.isAiEstimate
                 )
             }.onFailure { err ->
                 _errorMessage.value = err.localizedMessage ?: "Failed to analyze photo"
             }
+        }
+    }
+
+    // ==========================================
+    // MANUAL LOGGING & EDIT FLOW
+    // ==========================================
+
+    fun openEditMeal(meal: MealEntity) {
+        _reviewState.value = ReviewMealState(
+            id = meal.id,
+            mealName = meal.mealName,
+            calories = meal.calories,
+            protein = meal.proteinGrams,
+            carbs = meal.carbsGrams,
+            fats = meal.fatsGrams,
+            fiber = meal.fiberGrams,
+            sugar = meal.sugarGrams,
+            mealType = meal.mealType,
+            notes = meal.notes,
+            photoBitmap = null,
+            imagePath = meal.imageUriOrBase64,
+            isAiEstimate = meal.isAiEstimated,
+            originalTimestamp = meal.timestamp
+        )
+    }
+
+    fun logMealManually(
+        name: String,
+        calories: Int,
+        protein: Float,
+        carbs: Float,
+        fats: Float,
+        fiber: Float = 0f,
+        sugar: Float = 0f,
+        mealType: String = "Meal",
+        notes: String = ""
+    ) {
+        viewModelScope.launch {
+            val timestamp = calculateTimestampForSelectedDate(null)
+            val meal = MealEntity(
+                id = 0,
+                mealName = name.ifBlank { "Logged Meal" },
+                calories = calories.coerceAtLeast(0),
+                proteinGrams = protein.coerceAtLeast(0f),
+                carbsGrams = carbs.coerceAtLeast(0f),
+                fatsGrams = fats.coerceAtLeast(0f),
+                fiberGrams = fiber.coerceAtLeast(0f),
+                sugarGrams = sugar.coerceAtLeast(0f),
+                mealType = mealType.ifBlank { "Meal" },
+                timestamp = timestamp,
+                imageUriOrBase64 = null,
+                notes = notes,
+                isAiEstimated = false
+            )
+            repository.saveMeal(meal)
+            showInfo("Saved \"${meal.mealName}\" to your log")
         }
     }
 
@@ -227,23 +371,74 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
         protein: Float,
         carbs: Float,
         fats: Float,
+        fiber: Float,
+        sugar: Float,
+        mealType: String,
         notes: String
     ) {
-        val currentReview = _reviewState.value
+        val currentReview = _reviewState.value ?: return
         viewModelScope.launch {
+            val isEditing = currentReview.id != null
+            val timestamp = calculateTimestampForSelectedDate(currentReview.originalTimestamp)
+
             val meal = MealEntity(
+                id = currentReview.id ?: 0L,
                 mealName = name.ifBlank { "Logged Meal" },
                 calories = calories.coerceAtLeast(0),
                 proteinGrams = protein.coerceAtLeast(0f),
                 carbsGrams = carbs.coerceAtLeast(0f),
                 fatsGrams = fats.coerceAtLeast(0f),
-                timestamp = System.currentTimeMillis(),
-                imageUriOrBase64 = currentReview?.imagePath,
-                notes = notes
+                fiberGrams = fiber.coerceAtLeast(0f),
+                sugarGrams = sugar.coerceAtLeast(0f),
+                mealType = mealType.ifBlank { "Meal" },
+                timestamp = timestamp,
+                imageUriOrBase64 = currentReview.imagePath,
+                notes = notes,
+                isAiEstimated = currentReview.isAiEstimate
             )
-            repository.saveMeal(meal)
+
+            if (isEditing) {
+                repository.updateMeal(meal)
+                showInfo("Updated \"${meal.mealName}\"")
+            } else {
+                repository.saveMeal(meal)
+                showInfo("Saved \"${meal.mealName}\" to your daily log")
+            }
+
             _reviewState.value = null
-            _infoMessage.value = "Saved \"${meal.mealName}\" to your daily log"
+        }
+    }
+
+    private fun calculateTimestampForSelectedDate(originalTimestamp: Long?): Long {
+        if (originalTimestamp != null) {
+            return originalTimestamp
+        }
+        val nowCal = Calendar.getInstance()
+        val selectedCal = Calendar.getInstance().apply { timeInMillis = _selectedDateMillis.value }
+
+        val isSameDay = nowCal.get(Calendar.YEAR) == selectedCal.get(Calendar.YEAR) &&
+                nowCal.get(Calendar.DAY_OF_YEAR) == selectedCal.get(Calendar.DAY_OF_YEAR)
+
+        return if (isSameDay) {
+            System.currentTimeMillis()
+        } else {
+            // Apply current hour & minute to selected calendar day
+            selectedCal.apply {
+                set(Calendar.HOUR_OF_DAY, nowCal.get(Calendar.HOUR_OF_DAY))
+                set(Calendar.MINUTE, nowCal.get(Calendar.MINUTE))
+                set(Calendar.SECOND, nowCal.get(Calendar.SECOND))
+            }.timeInMillis
+        }
+    }
+
+    private fun guessMealTypeFromTime(): String {
+        val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return when (hour) {
+            in 5..10 -> "Breakfast"
+            in 11..14 -> "Lunch"
+            in 15..17 -> "Snack"
+            in 18..22 -> "Dinner"
+            else -> "Snack"
         }
     }
 
@@ -251,12 +446,35 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
         _reviewState.value = null
     }
 
+    // ==========================================
+    // MEAL DELETION WITH PHOTO DISK CLEANUP
+    // ==========================================
+
     fun deleteMeal(mealId: Long) {
         viewModelScope.launch {
+            val meal = repository.getMealById(mealId)
+            if (meal?.imageUriOrBase64 != null) {
+                deletePhotoFile(meal.imageUriOrBase64)
+            }
             repository.deleteMeal(mealId)
-            _infoMessage.value = "Meal deleted"
+            showInfo("Meal deleted")
         }
     }
+
+    private fun deletePhotoFile(path: String) {
+        try {
+            val file = File(path)
+            if (file.exists()) {
+                file.delete()
+            }
+        } catch (_: Exception) {
+            // non-fatal cleanup
+        }
+    }
+
+    // ==========================================
+    // GOALS & NOTIFICATIONS
+    // ==========================================
 
     fun updateGoals(calories: Int, protein: Float, carbs: Float, fats: Float) {
         viewModelScope.launch {
@@ -269,7 +487,7 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             )
             repository.updateGoals(updated)
             _showGoalsDialog.value = false
-            _infoMessage.value = "Macro targets updated"
+            showInfo("Macro targets updated")
         }
     }
 
@@ -297,6 +515,17 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
         _infoMessage.value = null
     }
 
+    private fun showInfo(msg: String) {
+        _infoMessage.value = msg
+        infoBannerJob?.cancel()
+        infoBannerJob = viewModelScope.launch {
+            delay(4500)
+            if (_infoMessage.value == msg) {
+                _infoMessage.value = null
+            }
+        }
+    }
+
     // ==========================================
     // DATA EXPORT & IMPORT BACKUP LOGIC
     // ==========================================
@@ -307,7 +536,7 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
 
         val root = JSONObject()
         root.put("appName", "NutriSnap")
-        root.put("version", 1)
+        root.put("version", 2)
         root.put("exportedAt", SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US).format(Date()))
 
         val goalsObj = JSONObject()
@@ -325,8 +554,12 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             mObj.put("proteinGrams", m.proteinGrams.toDouble())
             mObj.put("carbsGrams", m.carbsGrams.toDouble())
             mObj.put("fatsGrams", m.fatsGrams.toDouble())
+            mObj.put("fiberGrams", m.fiberGrams.toDouble())
+            mObj.put("sugarGrams", m.sugarGrams.toDouble())
+            mObj.put("mealType", m.mealType)
             mObj.put("timestamp", m.timestamp)
             mObj.put("notes", m.notes)
+            mObj.put("isAiEstimated", m.isAiEstimated)
             mObj.put("imageUriOrBase64", m.imageUriOrBase64 ?: "")
             mealsArray.put(mObj)
         }
@@ -343,7 +576,7 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
                         stream.write(jsonString.toByteArray(Charsets.UTF_8))
                     }
                 }
-                _infoMessage.value = "Backup successfully exported!"
+                showInfo("Backup successfully exported!")
             } catch (e: Exception) {
                 _errorMessage.value = "Failed to export backup: ${e.localizedMessage}"
             }
@@ -367,7 +600,7 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private fun parseBackupJsonContent(jsonStr: String): BackupImportPreview {
+    fun parseBackupJsonContent(jsonStr: String): BackupImportPreview {
         val root = JSONObject(jsonStr)
         val goalsObj = root.optJSONObject("macroGoals")
         val goals = if (goalsObj != null) {
@@ -395,9 +628,13 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
                         proteinGrams = mObj.optDouble("proteinGrams", 0.0).toFloat(),
                         carbsGrams = mObj.optDouble("carbsGrams", 0.0).toFloat(),
                         fatsGrams = mObj.optDouble("fatsGrams", 0.0).toFloat(),
+                        fiberGrams = mObj.optDouble("fiberGrams", 0.0).toFloat(),
+                        sugarGrams = mObj.optDouble("sugarGrams", 0.0).toFloat(),
+                        mealType = mObj.optString("mealType", "Meal"),
                         timestamp = mObj.optLong("timestamp", System.currentTimeMillis()),
                         imageUriOrBase64 = mObj.optString("imageUriOrBase64").takeIf { it.isNotBlank() },
-                        notes = mObj.optString("notes", "")
+                        notes = mObj.optString("notes", ""),
+                        isAiEstimated = mObj.optBoolean("isAiEstimated", true)
                     )
                 )
             }
@@ -415,8 +652,7 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 repository.overwriteAllData(pending.meals, pending.goals)
                 _pendingImport.value = null
-                _infoMessage.value = "Data restored successfully! (${pending.mealsCount} meals imported)"
-                // Refresh today's date timestamp trigger
+                showInfo("Data restored successfully! (${pending.mealsCount} meals imported)")
                 _selectedDateMillis.value = System.currentTimeMillis()
             } catch (e: Exception) {
                 _errorMessage.value = "Failed to restore data: ${e.localizedMessage}"
@@ -431,8 +667,12 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
     private suspend fun saveImageToInternalStorage(bitmap: Bitmap): String = withContext(Dispatchers.IO) {
         try {
             val context = getApplication<Application>().applicationContext
-            val filename = "meal_photo_${System.currentTimeMillis()}.jpg"
-            val file = File(context.filesDir, filename)
+            val photosDir = File(context.filesDir, "meal_photos")
+            if (!photosDir.exists()) {
+                photosDir.mkdirs()
+            }
+            val filename = "meal_${System.currentTimeMillis()}.jpg"
+            val file = File(photosDir, filename)
             FileOutputStream(file).use { out ->
                 bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
             }

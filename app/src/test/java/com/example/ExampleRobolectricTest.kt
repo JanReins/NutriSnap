@@ -1,5 +1,6 @@
 package com.example
 
+import android.app.Application
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
@@ -9,10 +10,12 @@ import com.example.data.local.MealEntity
 import com.example.data.local.NutriSnapDao
 import com.example.data.local.NutriSnapDatabase
 import com.example.data.repository.NutriRepository
+import com.example.ui.viewmodel.NutriViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -61,7 +64,7 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `test meal insertion and daily query`() = runBlocking {
+  fun `test meal insertion update and daily query`() = runBlocking {
     val now = System.currentTimeMillis()
     val meal = MealEntity(
       mealName = "Oatmeal with Blueberries",
@@ -69,6 +72,9 @@ class ExampleRobolectricTest {
       proteinGrams = 12f,
       carbsGrams = 52f,
       fatsGrams = 6f,
+      fiberGrams = 5f,
+      sugarGrams = 10f,
+      mealType = "Breakfast",
       timestamp = now,
       notes = "Fresh berries and rolled oats"
     )
@@ -80,6 +86,16 @@ class ExampleRobolectricTest {
     assertEquals(1, todayMeals.size)
     assertEquals("Oatmeal with Blueberries", todayMeals[0].mealName)
     assertEquals(320, todayMeals[0].calories)
+    assertEquals("Breakfast", todayMeals[0].mealType)
+
+    // Test update
+    val updatedMeal = todayMeals[0].copy(mealName = "Oatmeal with Extra Almonds", calories = 390)
+    dao.updateMeal(updatedMeal)
+
+    val afterUpdate = dao.getMealById(id)
+    assertNotNull(afterUpdate)
+    assertEquals("Oatmeal with Extra Almonds", afterUpdate?.mealName)
+    assertEquals(390, afterUpdate?.calories)
 
     // Test delete
     dao.deleteMealById(id)
@@ -88,15 +104,71 @@ class ExampleRobolectricTest {
   }
 
   @Test
-  fun `test gemini meal local fallback estimation`() = runBlocking {
+  fun `test gemini meal local fallback estimation with honest provenance and filipino dishes`() = runBlocking {
     val service = GeminiMealService()
-    val result = service.analyzeMeal("2 eggs and whole wheat toast", null)
 
-    assertTrue(result.isSuccess)
-    val estimated = result.getOrNull()
-    assertNotNull(estimated)
-    assertEquals("Eggs & Toast", estimated?.mealName)
-    assertTrue((estimated?.calories ?: 0) > 0)
-    assertTrue((estimated?.protein ?: 0f) > 0f)
+    // Western staple fallback
+    val resultToast = service.analyzeMeal("2 eggs and whole wheat toast", null)
+    assertTrue(resultToast.isSuccess)
+    val estimatedToast = resultToast.getOrNull()
+    assertNotNull(estimatedToast)
+    assertFalse(estimatedToast!!.isAiEstimate) // Honest local provenance
+    assertTrue(estimatedToast.calories > 0)
+    assertTrue(estimatedToast.protein > 0f)
+
+    // Filipino staple fallback (Chicken Adobo)
+    val resultAdobo = service.analyzeMeal("Chicken adobo with 1 cup rice", null)
+    assertTrue(resultAdobo.isSuccess)
+    val estimatedAdobo = resultAdobo.getOrNull()
+    assertNotNull(estimatedAdobo)
+    assertEquals("Chicken Adobo with Rice", estimatedAdobo!!.mealName)
+    assertEquals("Lunch", estimatedAdobo.mealType)
+    assertEquals(510, estimatedAdobo.calories)
+    assertEquals(36f, estimatedAdobo.protein)
+    assertFalse(estimatedAdobo.isAiEstimate)
+  }
+
+  @Test
+  fun `test backup json parsing and import preview`() {
+    val app = ApplicationProvider.getApplicationContext<Application>()
+    val vm = NutriViewModel(app)
+
+    val jsonString = """
+      {
+        "appName": "NutriSnap",
+        "version": 2,
+        "exportedAt": "2026-08-28T12:00:00Z",
+        "macroGoals": {
+          "targetCalories": 2400,
+          "targetProtein": 180.0,
+          "targetCarbs": 220.0,
+          "targetFats": 70.0
+        },
+        "meals": [
+          {
+            "mealName": "Grilled Chicken Rice Bowl",
+            "calories": 520,
+            "proteinGrams": 42.0,
+            "carbsGrams": 58.0,
+            "fatsGrams": 12.0,
+            "fiberGrams": 3.0,
+            "sugarGrams": 2.0,
+            "mealType": "Lunch",
+            "timestamp": 1724800000000,
+            "notes": "150g chicken breast",
+            "isAiEstimated": true,
+            "imageUriOrBase64": ""
+          }
+        ]
+      }
+    """.trimIndent()
+
+    val preview = vm.parseBackupJsonContent(jsonString)
+    assertEquals(1, preview.mealsCount)
+    assertEquals(2400, preview.goals.targetCalories)
+    assertEquals(180f, preview.goals.targetProtein)
+    assertEquals("Grilled Chicken Rice Bowl", preview.meals[0].mealName)
+    assertEquals(520, preview.meals[0].calories)
+    assertEquals("Lunch", preview.meals[0].mealType)
   }
 }
