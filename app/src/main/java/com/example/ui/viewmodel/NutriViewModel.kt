@@ -110,6 +110,12 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
     private val _customApiKey = MutableStateFlow(prefs.getString("custom_gemini_api_key", null))
     val customApiKey: StateFlow<String?> = _customApiKey.asStateFlow()
 
+    private val _isPinEnabled = MutableStateFlow(prefs.getBoolean("pin_lock_enabled", false))
+    val isPinEnabled: StateFlow<Boolean> = _isPinEnabled.asStateFlow()
+
+    private val _isUnlocked = MutableStateFlow(!_isPinEnabled.value)
+    val isUnlocked: StateFlow<Boolean> = _isUnlocked.asStateFlow()
+
     // Combined NutriUiState Flow
     val uiState: StateFlow<NutriUiState> = combine(
         _isDarkMode,
@@ -120,7 +126,9 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
         _infoMessage,
         _reviewState,
         _pendingImport,
-        _customApiKey
+        _customApiKey,
+        _isPinEnabled,
+        _isUnlocked
     ) { flows: Array<Any?> ->
         NutriUiState(
             isDarkMode = flows[0] as Boolean,
@@ -131,7 +139,9 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             infoMessage = flows[5] as? String,
             reviewState = flows[6] as? ReviewMealState,
             pendingImport = flows[7] as? BackupImportPreview,
-            customApiKey = flows[8] as? String
+            customApiKey = flows[8] as? String,
+            isPinEnabled = flows[9] as Boolean,
+            isUnlocked = flows[10] as Boolean
         )
     }.stateIn(
         scope = viewModelScope,
@@ -139,7 +149,9 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
         initialValue = NutriUiState(
             isDarkMode = _isDarkMode.value,
             selectedDateMillis = _selectedDateMillis.value,
-            customApiKey = _customApiKey.value
+            customApiKey = _customApiKey.value,
+            isPinEnabled = _isPinEnabled.value,
+            isUnlocked = _isUnlocked.value
         )
     )
 
@@ -685,6 +697,103 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             file.absolutePath
         } catch (e: Exception) {
             ""
+        }
+    }
+
+    // ==========================================
+    // PIN LOCK & SECURITY LOGIC
+    // ==========================================
+
+    private fun hashPin(pin: String, salt: String): String {
+        val md = java.security.MessageDigest.getInstance("SHA-256")
+        val bytes = md.digest((pin + salt).toByteArray(Charsets.UTF_8))
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    fun verifyPin(inputPin: String): Boolean {
+        if (!_isPinEnabled.value) {
+            _isUnlocked.value = true
+            return true
+        }
+        val storedHash = prefs.getString("pin_hash", null) ?: return false
+        val storedSalt = prefs.getString("pin_salt", "") ?: ""
+        val hash = hashPin(inputPin, storedSalt)
+        val matches = hash == storedHash
+        if (matches) {
+            _isUnlocked.value = true
+        }
+        return matches
+    }
+
+    fun setPin(newPin: String): Boolean {
+        if (newPin.length !in 4..6 || !newPin.all { it.isDigit() }) {
+            return false
+        }
+        val salt = java.util.UUID.randomUUID().toString()
+        val hash = hashPin(newPin, salt)
+        prefs.edit()
+            .putBoolean("pin_lock_enabled", true)
+            .putString("pin_hash", hash)
+            .putString("pin_salt", salt)
+            .apply()
+
+        _isPinEnabled.value = true
+        _isUnlocked.value = true
+        showInfo("PIN lock enabled successfully")
+        return true
+    }
+
+    fun changePin(currentPin: String, newPin: String): Boolean {
+        val storedHash = prefs.getString("pin_hash", null) ?: return false
+        val storedSalt = prefs.getString("pin_salt", "") ?: ""
+        if (hashPin(currentPin, storedSalt) != storedHash) {
+            return false
+        }
+        if (newPin.length !in 4..6 || !newPin.all { it.isDigit() }) {
+            return false
+        }
+        val newSalt = java.util.UUID.randomUUID().toString()
+        val newHash = hashPin(newPin, newSalt)
+        prefs.edit()
+            .putString("pin_hash", newHash)
+            .putString("pin_salt", newSalt)
+            .apply()
+
+        _isUnlocked.value = true
+        showInfo("PIN updated successfully")
+        return true
+    }
+
+    fun removePin(currentPin: String): Boolean {
+        val storedHash = prefs.getString("pin_hash", null) ?: return false
+        val storedSalt = prefs.getString("pin_salt", "") ?: ""
+        if (hashPin(currentPin, storedSalt) != storedHash) {
+            return false
+        }
+        prefs.edit()
+            .putBoolean("pin_lock_enabled", false)
+            .remove("pin_hash")
+            .remove("pin_salt")
+            .apply()
+
+        _isPinEnabled.value = false
+        _isUnlocked.value = true
+        showInfo("PIN lock removed")
+        return true
+    }
+
+    fun lockApp() {
+        if (_isPinEnabled.value) {
+            _isUnlocked.value = false
+        }
+    }
+
+    fun checkBackgroundTimeoutAndLock(backgroundTimestampMillis: Long) {
+        if (_isPinEnabled.value && backgroundTimestampMillis > 0) {
+            val elapsed = System.currentTimeMillis() - backgroundTimestampMillis
+            if (elapsed >= 15_000L) {
+                _isUnlocked.value = false
+            }
         }
     }
 }
