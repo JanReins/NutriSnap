@@ -11,8 +11,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.example.ui.screens.HomeScreen
-import com.example.ui.theme.MyApplicationTheme
+import com.example.ui.navigation.NutriNavGraph
+import com.example.ui.theme.NutriSnapTheme
 import com.example.ui.viewmodel.NutriViewModel
 
 class MainActivity : ComponentActivity() {
@@ -24,12 +24,12 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
-            MyApplicationTheme(darkTheme = isDarkMode) {
+            NutriSnapTheme(darkTheme = isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    HomeScreen(viewModel = viewModel)
+                    NutriNavGraph(viewModel = viewModel)
                 }
             }
         }
