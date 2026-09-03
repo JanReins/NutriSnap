@@ -18,6 +18,7 @@ import com.example.ui.viewmodel.NutriViewModel
 class MainActivity : ComponentActivity() {
 
     private val viewModel: NutriViewModel by viewModels()
+    private var lastBackgroundTimeMillis: Long = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,6 +33,18 @@ class MainActivity : ComponentActivity() {
                     NutriNavGraph(viewModel = viewModel)
                 }
             }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        lastBackgroundTimeMillis = System.currentTimeMillis()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (lastBackgroundTimeMillis > 0) {
+            viewModel.checkBackgroundTimeoutAndLock(lastBackgroundTimeMillis)
         }
     }
 }

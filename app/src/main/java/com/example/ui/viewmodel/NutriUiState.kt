@@ -12,5 +12,7 @@ data class NutriUiState(
     val infoMessage: String? = null,
     val reviewState: ReviewMealState? = null,
     val pendingImport: BackupImportPreview? = null,
-    val customApiKey: String? = null
+    val customApiKey: String? = null,
+    val isPinEnabled: Boolean = false,
+    val isUnlocked: Boolean = true
 )
