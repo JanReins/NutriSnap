@@ -16,9 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,8 +31,6 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.RestaurantMenu
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Warning
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -63,8 +59,6 @@ import com.example.ui.components.DailyMealsFeed
 import com.example.ui.components.MacroDashboard
 import com.example.ui.components.MealInputSection
 import com.example.ui.components.MealReviewDialog
-import com.example.ui.components.SetGoalsDialog
-import com.example.ui.components.SettingsDialog
 import com.example.ui.theme.EmeraldContainer
 import com.example.ui.theme.EmeraldDark
 import com.example.ui.theme.EmeraldPrimary
@@ -80,22 +74,16 @@ import java.util.Locale
 @Composable
 fun HomeScreen(
     viewModel: NutriViewModel,
+    onNavigateToGoals: () -> Unit,
+    onNavigateToSettings: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val isDarkMode by viewModel.isDarkMode.collectAsStateWithLifecycle()
+    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val todayMeals by viewModel.todayMeals.collectAsStateWithLifecycle()
     val macroGoals by viewModel.macroGoals.collectAsStateWithLifecycle()
-    val isAnalyzing by viewModel.isAnalyzing.collectAsStateWithLifecycle()
-    val analysisStatusText by viewModel.analysisStatusText.collectAsStateWithLifecycle()
-    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
-    val infoMessage by viewModel.infoMessage.collectAsStateWithLifecycle()
-    val reviewState by viewModel.reviewState.collectAsStateWithLifecycle()
-    val showGoalsDialog by viewModel.showGoalsDialog.collectAsStateWithLifecycle()
-    val showSettingsDialog by viewModel.showSettingsDialog.collectAsStateWithLifecycle()
-    val selectedDateMillis by viewModel.selectedDateMillis.collectAsStateWithLifecycle()
 
-    val formattedDateText = remember(selectedDateMillis) {
-        val selectedCal = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
+    val formattedDateText = remember(uiState.selectedDateMillis) {
+        val selectedCal = Calendar.getInstance().apply { timeInMillis = uiState.selectedDateMillis }
         val nowCal = Calendar.getInstance()
 
         val isToday = selectedCal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR) &&
@@ -106,14 +94,14 @@ fun HomeScreen(
                 selectedCal.get(Calendar.DAY_OF_YEAR) == yesterdayCal.get(Calendar.DAY_OF_YEAR)
 
         when {
-            isToday -> "Today, ${SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(selectedDateMillis))}"
-            isYesterday -> "Yesterday, ${SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(selectedDateMillis))}"
-            else -> SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date(selectedDateMillis))
+            isToday -> "Today, ${SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(uiState.selectedDateMillis))}"
+            isYesterday -> "Yesterday, ${SimpleDateFormat("MMM d", Locale.getDefault()).format(Date(uiState.selectedDateMillis))}"
+            else -> SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(Date(uiState.selectedDateMillis))
         }
     }
 
-    val isCurrentDayToday = remember(selectedDateMillis) {
-        val selectedCal = Calendar.getInstance().apply { timeInMillis = selectedDateMillis }
+    val isCurrentDayToday = remember(uiState.selectedDateMillis) {
+        val selectedCal = Calendar.getInstance().apply { timeInMillis = uiState.selectedDateMillis }
         val nowCal = Calendar.getInstance()
         selectedCal.get(Calendar.YEAR) == nowCal.get(Calendar.YEAR) &&
                 selectedCal.get(Calendar.DAY_OF_YEAR) == nowCal.get(Calendar.DAY_OF_YEAR)
@@ -161,7 +149,7 @@ fun HomeScreen(
                 actions = {
                     // Set Goals Target Button
                     IconButton(
-                        onClick = { viewModel.openGoalsDialog() },
+                        onClick = onNavigateToGoals,
                         modifier = Modifier.testTag("open_goals_button")
                     ) {
                         Icon(
@@ -177,15 +165,15 @@ fun HomeScreen(
                         modifier = Modifier.testTag("theme_toggle_button")
                     ) {
                         Icon(
-                            imageVector = if (isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
-                            contentDescription = if (isDarkMode) "Switch to Light Theme" else "Switch to Dark Theme",
+                            imageVector = if (uiState.isDarkMode) Icons.Default.LightMode else Icons.Default.DarkMode,
+                            contentDescription = if (uiState.isDarkMode) "Switch to Light Theme" else "Switch to Dark Theme",
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
 
                     // Settings & Backup Menu Button
                     IconButton(
-                        onClick = { viewModel.openSettings() },
+                        onClick = onNavigateToSettings,
                         modifier = Modifier.testTag("open_settings_button")
                     ) {
                         Icon(
@@ -212,11 +200,11 @@ fun HomeScreen(
         ) {
             // Notification / Info Banner
             AnimatedVisibility(
-                visible = infoMessage != null,
+                visible = uiState.infoMessage != null,
                 enter = fadeIn() + slideInVertically(),
                 exit = fadeOut() + slideOutVertically()
             ) {
-                infoMessage?.let { info ->
+                uiState.infoMessage?.let { info ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -267,11 +255,11 @@ fun HomeScreen(
 
             // Error Banner
             AnimatedVisibility(
-                visible = errorMessage != null,
+                visible = uiState.errorMessage != null,
                 enter = fadeIn() + slideInVertically(),
                 exit = fadeOut() + slideOutVertically()
             ) {
-                errorMessage?.let { err ->
+                uiState.errorMessage?.let { err ->
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -420,8 +408,8 @@ fun HomeScreen(
 
             // Meal Input Section (Describe / Photo Snap / Manual Entry)
             MealInputSection(
-                isAnalyzing = isAnalyzing,
-                analysisStatusText = analysisStatusText,
+                isAnalyzing = uiState.isAnalyzing,
+                analysisStatusText = uiState.analysisStatusText,
                 onAnalyzeText = { text -> viewModel.analyzeTextMeal(text) },
                 onAnalyzePhoto = { bitmap, prompt -> viewModel.analyzePhotoMeal(bitmap, prompt) },
                 onLogManually = { name, cals, p, c, f, fib, sug, type, notes ->
@@ -441,29 +429,13 @@ fun HomeScreen(
     }
 
     // Dialogs
-    if (reviewState != null) {
+    if (uiState.reviewState != null) {
         MealReviewDialog(
-            reviewState = reviewState!!,
+            reviewState = uiState.reviewState!!,
             onSave = { name, cals, p, c, f, fib, sug, type, notes ->
                 viewModel.saveReviewedMeal(name, cals, p, c, f, fib, sug, type, notes)
             },
             onDismiss = { viewModel.dismissReview() }
-        )
-    }
-
-    if (showGoalsDialog) {
-        SetGoalsDialog(
-            currentGoals = macroGoals,
-            onSaveGoals = { cal, p, c, f -> viewModel.updateGoals(cal, p, c, f) },
-            onDismiss = { viewModel.closeGoalsDialog() }
-        )
-    }
-
-    if (showSettingsDialog) {
-        SettingsDialog(
-            viewModel = viewModel,
-            isDarkMode = isDarkMode,
-            onDismiss = { viewModel.closeSettings() }
         )
     }
 }

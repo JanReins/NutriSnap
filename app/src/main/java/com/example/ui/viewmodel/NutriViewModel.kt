@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -79,22 +80,19 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
         repository = NutriRepository(db.nutriSnapDao())
     }
 
-    // Theme state (persisted locally, default = light theme)
+    // Individual state flows
     private val _isDarkMode = MutableStateFlow(prefs.getBoolean("dark_theme_enabled", false))
     val isDarkMode: StateFlow<Boolean> = _isDarkMode.asStateFlow()
 
-    // Selected Date Navigation state (defaults to today)
     private val _selectedDateMillis = MutableStateFlow(System.currentTimeMillis())
     val selectedDateMillis: StateFlow<Long> = _selectedDateMillis.asStateFlow()
 
-    // AI Analysis status
     private val _isAnalyzing = MutableStateFlow(false)
     val isAnalyzing: StateFlow<Boolean> = _isAnalyzing.asStateFlow()
 
     private val _analysisStatusText = MutableStateFlow("Analyzing your meal with Gemini AI...")
     val analysisStatusText: StateFlow<String> = _analysisStatusText.asStateFlow()
 
-    // Status notifications & banners
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
 
@@ -103,22 +101,47 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
 
     private var infoBannerJob: Job? = null
 
-    // Dialog states
     private val _reviewState = MutableStateFlow<ReviewMealState?>(null)
     val reviewState: StateFlow<ReviewMealState?> = _reviewState.asStateFlow()
-
-    private val _showGoalsDialog = MutableStateFlow(false)
-    val showGoalsDialog: StateFlow<Boolean> = _showGoalsDialog.asStateFlow()
-
-    private val _showSettingsDialog = MutableStateFlow(false)
-    val showSettingsDialog: StateFlow<Boolean> = _showSettingsDialog.asStateFlow()
 
     private val _pendingImport = MutableStateFlow<BackupImportPreview?>(null)
     val pendingImport: StateFlow<BackupImportPreview?> = _pendingImport.asStateFlow()
 
-    // API Key preference
     private val _customApiKey = MutableStateFlow(prefs.getString("custom_gemini_api_key", null))
     val customApiKey: StateFlow<String?> = _customApiKey.asStateFlow()
+
+    // Combined NutriUiState Flow
+    val uiState: StateFlow<NutriUiState> = combine(
+        _isDarkMode,
+        _selectedDateMillis,
+        _isAnalyzing,
+        _analysisStatusText,
+        _errorMessage,
+        _infoMessage,
+        _reviewState,
+        _pendingImport,
+        _customApiKey
+    ) { flows: Array<Any?> ->
+        NutriUiState(
+            isDarkMode = flows[0] as Boolean,
+            selectedDateMillis = flows[1] as Long,
+            isAnalyzing = flows[2] as Boolean,
+            analysisStatusText = flows[3] as String,
+            errorMessage = flows[4] as? String,
+            infoMessage = flows[5] as? String,
+            reviewState = flows[6] as? ReviewMealState,
+            pendingImport = flows[7] as? BackupImportPreview,
+            customApiKey = flows[8] as? String
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = NutriUiState(
+            isDarkMode = _isDarkMode.value,
+            selectedDateMillis = _selectedDateMillis.value,
+            customApiKey = _customApiKey.value
+        )
+    )
 
     // Macro goals flow
     val macroGoals: StateFlow<MacroGoalEntity> = repository.getMacroGoals()
@@ -486,25 +509,8 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
                 targetFats = fats.coerceAtLeast(5f)
             )
             repository.updateGoals(updated)
-            _showGoalsDialog.value = false
             showInfo("Macro targets updated")
         }
-    }
-
-    fun openGoalsDialog() {
-        _showGoalsDialog.value = true
-    }
-
-    fun closeGoalsDialog() {
-        _showGoalsDialog.value = false
-    }
-
-    fun openSettings() {
-        _showSettingsDialog.value = true
-    }
-
-    fun closeSettings() {
-        _showSettingsDialog.value = false
     }
 
     fun clearError() {
