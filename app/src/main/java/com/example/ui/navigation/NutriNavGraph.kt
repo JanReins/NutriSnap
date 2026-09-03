@@ -14,6 +14,7 @@ import com.example.ui.screens.HomeScreen
 import com.example.ui.screens.LockMode
 import com.example.ui.screens.LockScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.SummaryScreen
 import com.example.ui.viewmodel.NutriViewModel
 
 object NutriDestinations {
@@ -21,6 +22,7 @@ object NutriDestinations {
     const val SETTINGS_ROUTE = "settings"
     const val GOALS_ROUTE = "goals"
     const val LOCK_ROUTE = "lock"
+    const val SUMMARY_ROUTE = "summary"
 }
 
 @Composable
@@ -78,7 +80,18 @@ fun NutriNavGraph(
                     navController.navigate(NutriDestinations.SETTINGS_ROUTE) {
                         launchSingleTop = true
                     }
+                },
+                onNavigateToSummary = {
+                    navController.navigate(NutriDestinations.SUMMARY_ROUTE) {
+                        launchSingleTop = true
+                    }
                 }
+            )
+        }
+        composable(NutriDestinations.SUMMARY_ROUTE) {
+            SummaryScreen(
+                viewModel = viewModel,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
         composable(NutriDestinations.GOALS_ROUTE) {

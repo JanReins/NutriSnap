@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.rounded.BarChart
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.Flag
 import androidx.compose.material.icons.rounded.Info
@@ -76,6 +77,7 @@ fun HomeScreen(
     viewModel: NutriViewModel,
     onNavigateToGoals: () -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToSummary: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -147,6 +149,18 @@ fun HomeScreen(
                     }
                 },
                 actions = {
+                    // Summary & Insights Button
+                    IconButton(
+                        onClick = onNavigateToSummary,
+                        modifier = Modifier.testTag("open_summary_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Rounded.BarChart,
+                            contentDescription = "View Insights and Summary",
+                            tint = EmeraldPrimary
+                        )
+                    }
+
                     // Set Goals Target Button
                     IconButton(
                         onClick = onNavigateToGoals,
