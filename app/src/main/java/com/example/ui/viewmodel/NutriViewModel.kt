@@ -34,6 +34,45 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
+
+enum class SummaryMode { WEEK, MONTH }
+
+data class DailyCalorieBar(
+    val dayLabel: String,
+    val fullDateFormatted: String,
+    val totalCalories: Int,
+    val isToday: Boolean,
+    val startOfDayMillis: Long
+)
+
+data class SummaryUiState(
+    val mode: SummaryMode = SummaryMode.WEEK,
+    val anchorDateMillis: Long = System.currentTimeMillis(),
+    val periodLabel: String = "",
+    val startDateMillis: Long = 0L,
+    val endDateMillis: Long = 0L,
+    val daysInPeriod: Int = 7,
+    val loggedDaysCount: Int = 0,
+    val totalCalories: Int = 0,
+    val totalProtein: Float = 0f,
+    val totalCarbs: Float = 0f,
+    val totalFats: Float = 0f,
+    val totalFiber: Float = 0f,
+    val totalSugar: Float = 0f,
+    val avgCalories: Int = 0,
+    val avgProtein: Float = 0f,
+    val avgCarbs: Float = 0f,
+    val avgFats: Float = 0f,
+    val avgFiber: Float = 0f,
+    val avgSugar: Float = 0f,
+    val dailyCalorieBars: List<DailyCalorieBar> = emptyList(),
+    val breakfastCount: Int = 0,
+    val lunchCount: Int = 0,
+    val dinnerCount: Int = 0,
+    val snackCount: Int = 0,
+    val isEmpty: Boolean = true
+)
 
 /**
  * State object representing an active meal review or edit dialog.
@@ -163,6 +202,40 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             initialValue = MacroGoalEntity(1, 2000, 150f, 200f, 65f)
         )
 
+    // Summary mode and anchor date flows
+    private val _summaryMode = MutableStateFlow(SummaryMode.WEEK)
+    val summaryMode: StateFlow<SummaryMode> = _summaryMode.asStateFlow()
+
+    private val _summaryAnchorDateMillis = MutableStateFlow(System.currentTimeMillis())
+    val summaryAnchorDateMillis: StateFlow<Long> = _summaryAnchorDateMillis.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val summaryMeals: StateFlow<List<MealEntity>> = combine(_summaryMode, _summaryAnchorDateMillis) { mode, anchor ->
+        Pair(mode, anchor)
+    }.flatMapLatest { (mode, anchor) ->
+        val (start, end) = when (mode) {
+            SummaryMode.WEEK -> getWeekRange(anchor)
+            SummaryMode.MONTH -> getMonthRange(anchor)
+        }
+        repository.getMealsBetween(start, end)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    val summaryUiState: StateFlow<SummaryUiState> = combine(
+        _summaryMode,
+        _summaryAnchorDateMillis,
+        summaryMeals
+    ) { mode, anchor, meals ->
+        computeSummaryUiState(mode, anchor, meals)
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = computeSummaryUiState(SummaryMode.WEEK, System.currentTimeMillis(), emptyList())
+    )
+
     // Meals for the selected date
     @OptIn(ExperimentalCoroutinesApi::class)
     val todayMeals: StateFlow<List<MealEntity>> = _selectedDateMillis
@@ -205,6 +278,7 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             add(Calendar.DAY_OF_YEAR, -1)
         }
         _selectedDateMillis.value = cal.timeInMillis
+        _summaryAnchorDateMillis.value = cal.timeInMillis
     }
 
     fun goToNextDay() {
@@ -213,14 +287,18 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             add(Calendar.DAY_OF_YEAR, 1)
         }
         _selectedDateMillis.value = cal.timeInMillis
+        _summaryAnchorDateMillis.value = cal.timeInMillis
     }
 
     fun goToToday() {
-        _selectedDateMillis.value = System.currentTimeMillis()
+        val now = System.currentTimeMillis()
+        _selectedDateMillis.value = now
+        _summaryAnchorDateMillis.value = now
     }
 
     fun selectDate(millis: Long) {
         _selectedDateMillis.value = millis
+        _summaryAnchorDateMillis.value = millis
     }
 
     fun logForYesterday() {
@@ -229,7 +307,243 @@ class NutriViewModel(application: Application) : AndroidViewModel(application) {
             add(Calendar.DAY_OF_YEAR, -1)
         }
         _selectedDateMillis.value = cal.timeInMillis
+        _summaryAnchorDateMillis.value = cal.timeInMillis
         showInfo("Viewing yesterday's log. New entries will be saved to yesterday.")
+    }
+
+    // ==========================================
+    // SUMMARY NAVIGATION LOGIC
+    // ==========================================
+
+    fun setSummaryMode(mode: SummaryMode) {
+        _summaryMode.value = mode
+    }
+
+    fun goToPreviousSummaryPeriod() {
+        val cal = Calendar.getInstance(Locale.getDefault()).apply { timeInMillis = _summaryAnchorDateMillis.value }
+        when (_summaryMode.value) {
+            SummaryMode.WEEK -> cal.add(Calendar.DAY_OF_YEAR, -7)
+            SummaryMode.MONTH -> cal.add(Calendar.MONTH, -1)
+        }
+        _summaryAnchorDateMillis.value = cal.timeInMillis
+    }
+
+    fun goToNextSummaryPeriod() {
+        val cal = Calendar.getInstance(Locale.getDefault()).apply { timeInMillis = _summaryAnchorDateMillis.value }
+        when (_summaryMode.value) {
+            SummaryMode.WEEK -> cal.add(Calendar.DAY_OF_YEAR, 7)
+            SummaryMode.MONTH -> cal.add(Calendar.MONTH, 1)
+        }
+        _summaryAnchorDateMillis.value = cal.timeInMillis
+    }
+
+    fun resetToCurrentSummaryPeriod() {
+        _summaryAnchorDateMillis.value = _selectedDateMillis.value
+    }
+
+    companion object {
+        fun getWeekRange(anchorMillis: Long): Pair<Long, Long> {
+            val cal = Calendar.getInstance(Locale.getDefault())
+            cal.timeInMillis = anchorMillis
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+
+            val dayOfWeek = cal.get(Calendar.DAY_OF_WEEK)
+            val daysFromMonday = if (dayOfWeek == Calendar.SUNDAY) 6 else dayOfWeek - Calendar.MONDAY
+            cal.add(Calendar.DAY_OF_YEAR, -daysFromMonday)
+            val startMillis = cal.timeInMillis
+
+            cal.add(Calendar.DAY_OF_YEAR, 6)
+            cal.set(Calendar.HOUR_OF_DAY, 23)
+            cal.set(Calendar.MINUTE, 59)
+            cal.set(Calendar.SECOND, 59)
+            cal.set(Calendar.MILLISECOND, 999)
+            val endMillis = cal.timeInMillis
+
+            return Pair(startMillis, endMillis)
+        }
+
+        fun getMonthRange(anchorMillis: Long): Pair<Long, Long> {
+            val cal = Calendar.getInstance(Locale.getDefault())
+            cal.timeInMillis = anchorMillis
+            cal.set(Calendar.DAY_OF_MONTH, 1)
+            cal.set(Calendar.HOUR_OF_DAY, 0)
+            cal.set(Calendar.MINUTE, 0)
+            cal.set(Calendar.SECOND, 0)
+            cal.set(Calendar.MILLISECOND, 0)
+            val startMillis = cal.timeInMillis
+
+            val maxDay = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
+            cal.set(Calendar.DAY_OF_MONTH, maxDay)
+            cal.set(Calendar.HOUR_OF_DAY, 23)
+            cal.set(Calendar.MINUTE, 59)
+            cal.set(Calendar.SECOND, 59)
+            cal.set(Calendar.MILLISECOND, 999)
+            val endMillis = cal.timeInMillis
+
+            return Pair(startMillis, endMillis)
+        }
+
+        fun computeSummaryUiState(
+            mode: SummaryMode,
+            anchorMillis: Long,
+            meals: List<MealEntity>
+        ): SummaryUiState {
+            val (startMillis, endMillis) = when (mode) {
+                SummaryMode.WEEK -> getWeekRange(anchorMillis)
+                SummaryMode.MONTH -> getMonthRange(anchorMillis)
+            }
+
+            val calStart = Calendar.getInstance(Locale.getDefault()).apply { timeInMillis = startMillis }
+            val calEnd = Calendar.getInstance(Locale.getDefault()).apply { timeInMillis = endMillis }
+
+            val daysInPeriod = when (mode) {
+                SummaryMode.WEEK -> 7
+                SummaryMode.MONTH -> calStart.getActualMaximum(Calendar.DAY_OF_MONTH)
+            }
+
+            val periodLabel = when (mode) {
+                SummaryMode.WEEK -> {
+                    val sameMonth = calStart.get(Calendar.MONTH) == calEnd.get(Calendar.MONTH)
+                    val sameYear = calStart.get(Calendar.YEAR) == calEnd.get(Calendar.YEAR)
+                    val monthFormat = SimpleDateFormat("MMM", Locale.getDefault())
+                    val dayFormat = SimpleDateFormat("d", Locale.getDefault())
+                    val yearFormat = SimpleDateFormat("yyyy", Locale.getDefault())
+
+                    val startMonth = monthFormat.format(calStart.time)
+                    val startDay = dayFormat.format(calStart.time)
+                    val endMonth = monthFormat.format(calEnd.time)
+                    val endDay = dayFormat.format(calEnd.time)
+                    val year = yearFormat.format(calStart.time)
+
+                    if (sameMonth && sameYear) {
+                        "$startMonth $startDay–$endDay, $year"
+                    } else if (sameYear) {
+                        "$startMonth $startDay – $endMonth $endDay, $year"
+                    } else {
+                        val endYear = yearFormat.format(calEnd.time)
+                        "$startMonth $startDay, $year – $endMonth $endDay, $endYear"
+                    }
+                }
+                SummaryMode.MONTH -> {
+                    SimpleDateFormat("MMMM yyyy", Locale.getDefault()).format(calStart.time)
+                }
+            }
+
+            val totalCals = meals.sumOf { it.calories }
+            val totalProt = meals.sumOf { it.proteinGrams.toDouble() }.toFloat()
+            val totalCarb = meals.sumOf { it.carbsGrams.toDouble() }.toFloat()
+            val totalFat = meals.sumOf { it.fatsGrams.toDouble() }.toFloat()
+            val totalFib = meals.sumOf { it.fiberGrams.toDouble() }.toFloat()
+            val totalSug = meals.sumOf { it.sugarGrams.toDouble() }.toFloat()
+
+            val divisor = daysInPeriod.coerceAtLeast(1)
+            val avgCals = (totalCals.toDouble() / divisor).roundToInt()
+            val avgProt = totalProt / divisor
+            val avgCarb = totalCarb / divisor
+            val avgFat = totalFat / divisor
+            val avgFib = totalFib / divisor
+            val avgSug = totalSug / divisor
+
+            var bCount = 0
+            var lCount = 0
+            var dCount = 0
+            var sCount = 0
+            meals.forEach { m ->
+                when (m.mealType.lowercase(Locale.getDefault()).trim()) {
+                    "breakfast" -> bCount++
+                    "lunch" -> lCount++
+                    "dinner" -> dCount++
+                    "snack" -> sCount++
+                    else -> sCount++
+                }
+            }
+
+            val dailyBars = mutableListOf<DailyCalorieBar>()
+            val todayCal = Calendar.getInstance(Locale.getDefault())
+
+            val loopCal = Calendar.getInstance(Locale.getDefault()).apply { timeInMillis = startMillis }
+            val loggedDaysSet = mutableSetOf<String>()
+
+            for (i in 0 until daysInPeriod) {
+                val dayStart = (loopCal.clone() as Calendar).apply {
+                    set(Calendar.HOUR_OF_DAY, 0)
+                    set(Calendar.MINUTE, 0)
+                    set(Calendar.SECOND, 0)
+                    set(Calendar.MILLISECOND, 0)
+                }.timeInMillis
+
+                val dayEnd = (loopCal.clone() as Calendar).apply {
+                    set(Calendar.HOUR_OF_DAY, 23)
+                    set(Calendar.MINUTE, 59)
+                    set(Calendar.SECOND, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }.timeInMillis
+
+                val dayMeals = meals.filter { it.timestamp in dayStart..dayEnd }
+                val dayCals = dayMeals.sumOf { it.calories }
+
+                val dayKey = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(loopCal.time)
+                if (dayMeals.isNotEmpty()) {
+                    loggedDaysSet.add(dayKey)
+                }
+
+                val isToday = loopCal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                        loopCal.get(Calendar.DAY_OF_YEAR) == todayCal.get(Calendar.DAY_OF_YEAR)
+
+                val dayLabel = when (mode) {
+                    SummaryMode.WEEK -> SimpleDateFormat("EEE", Locale.getDefault()).format(loopCal.time)
+                    SummaryMode.MONTH -> SimpleDateFormat("d", Locale.getDefault()).format(loopCal.time)
+                }
+
+                val fullDateFormatted = when (mode) {
+                    SummaryMode.WEEK -> SimpleDateFormat("EEE, MMM d", Locale.getDefault()).format(loopCal.time)
+                    SummaryMode.MONTH -> SimpleDateFormat("MMM d", Locale.getDefault()).format(loopCal.time)
+                }
+
+                dailyBars.add(
+                    DailyCalorieBar(
+                        dayLabel = dayLabel,
+                        fullDateFormatted = fullDateFormatted,
+                        totalCalories = dayCals,
+                        isToday = isToday,
+                        startOfDayMillis = dayStart
+                    )
+                )
+
+                loopCal.add(Calendar.DAY_OF_YEAR, 1)
+            }
+
+            return SummaryUiState(
+                mode = mode,
+                anchorDateMillis = anchorMillis,
+                periodLabel = periodLabel,
+                startDateMillis = startMillis,
+                endDateMillis = endMillis,
+                daysInPeriod = daysInPeriod,
+                loggedDaysCount = loggedDaysSet.size,
+                totalCalories = totalCals,
+                totalProtein = totalProt,
+                totalCarbs = totalCarb,
+                totalFats = totalFat,
+                totalFiber = totalFib,
+                totalSugar = totalSug,
+                avgCalories = avgCals,
+                avgProtein = avgProt,
+                avgCarbs = avgCarb,
+                avgFats = avgFat,
+                avgFiber = avgFib,
+                avgSugar = avgSug,
+                dailyCalorieBars = dailyBars,
+                breakfastCount = bCount,
+                lunchCount = lCount,
+                dinnerCount = dCount,
+                snackCount = sCount,
+                isEmpty = meals.isEmpty()
+            )
+        }
     }
 
     // ==========================================

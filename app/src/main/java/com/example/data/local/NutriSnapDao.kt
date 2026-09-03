@@ -26,6 +26,9 @@ interface NutriSnapDao {
     @Query("SELECT * FROM meals WHERE timestamp >= :startOfDay AND timestamp <= :endOfDay ORDER BY timestamp DESC")
     fun getMealsForDate(startOfDay: Long, endOfDay: Long): Flow<List<MealEntity>>
 
+    @Query("SELECT * FROM meals WHERE timestamp >= :startMillis AND timestamp <= :endMillis ORDER BY timestamp DESC")
+    fun getMealsBetween(startMillis: Long, endMillis: Long): Flow<List<MealEntity>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMeal(meal: MealEntity): Long
 

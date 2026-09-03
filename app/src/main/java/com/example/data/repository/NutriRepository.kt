@@ -21,6 +21,10 @@ class NutriRepository(
         return dao.getMealsForDate(startOfDay, endOfDay)
     }
 
+    fun getMealsBetween(startMillis: Long, endMillis: Long): Flow<List<MealEntity>> {
+        return dao.getMealsBetween(startMillis, endMillis)
+    }
+
     fun getAllMeals(): Flow<List<MealEntity>> {
         return dao.getAllMeals()
     }
